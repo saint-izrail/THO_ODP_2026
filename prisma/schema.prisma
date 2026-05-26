@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model Nasabah {
+  id           String         @id @default(uuid())
+  nik          String         @unique @db.VarChar(16)
+  nama         String         @db.VarChar(100)
+  email        String         @unique @db.VarChar(150)
+  nomorHp      String         @map("nomor_hp") @db.VarChar(20)
+  tabungan     TabunganHaji[]
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@map("nasabah")
+}
+
+model TabunganHaji {
+  id              String      @id @default(uuid())
+  nasabahId       String      @map("nasabah_id")
+  nasabah         Nasabah     @relation(fields: [nasabahId], references: [id])
+  nomorRekening   String      @unique @map("nomor_rekening") @db.VarChar(20)
+  saldo           BigInt      @default(0)
+  status          String      @default("AKTIF") @db.VarChar(20)
+  dibukaAt        DateTime    @default(now()) @map("dibuka_at")
+  transaksi       Transaksi[]
+
+  @@map("tabungan_haji")
+}
+
+model Transaksi {
+  id             String       @id @default(uuid())
+  tabunganId     String       @map("tabungan_id")
+  tabungan       TabunganHaji @relation(fields: [tabunganId], references: [id])
+  jenis          String       @db.VarChar(20)
+  nominal        BigInt
+  saldoSebelum   BigInt       @map("saldo_sebelum")
+  saldoSesudah   BigInt       @map("saldo_sesudah")
+  referensi      String       @unique @db.VarChar(50)
+  metode         String?      @db.VarChar(20)
+  waktu          DateTime     @default(now())
+
+  @@map("transaksi")
+}

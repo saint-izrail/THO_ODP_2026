@@ -1,0 +1,399 @@
+{
+  "info": {
+    "name": "Tabungan Haji API",
+    "description": "Koleksi endpoint untuk Tabungan Haji API.\n\n**Cara pakai:**\n1. Import file ini + `tabungan-haji.postman_environment.json`.\n2. Pilih environment `Tabungan Haji - Local` di pojok kanan atas Postman.\n3. Jalankan `npm run dev` di project.\n4. Test mulai dari folder Health → Nasabah (Create akan otomatis menyimpan `nasabahId` ke environment, dipakai oleh request Detail/Update/Delete).\n5. Bisa juga di-run sekaligus via **Collection Runner** — tiap request sudah punya assertion otomatis.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response berisi status, service, timestamp', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('status', 'ok');",
+                  "  pm.expect(json).to.have.property('service');",
+                  "  pm.expect(json).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nasabah",
+      "item": [
+        {
+          "name": "Create Nasabah",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate NIK & email unik tiap run agar tidak terkena unique constraint",
+                  "const ts = Date.now().toString();",
+                  "const nik = ('32012345' + ts).slice(-16);",
+                  "pm.variables.set('runNik', nik);",
+                  "pm.variables.set('runEmail', `ahmad.fauzi.${ts}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Envelope { data, error, meta } valid', () => {",
+                  "  pm.expect(json).to.have.property('data');",
+                  "  pm.expect(json).to.have.property('error', null);",
+                  "  pm.expect(json).to.have.property('meta');",
+                  "  pm.expect(json.meta).to.have.property('timestamp');",
+                  "});",
+                  "",
+                  "pm.test('Data nasabah memiliki id dan field yang dikirim', () => {",
+                  "  pm.expect(json.data).to.have.property('nasabah');",
+                  "  pm.expect(json.data.nasabah).to.have.property('id');",
+                  "  pm.expect(json.data.nasabah).to.have.property('nik');",
+                  "  pm.expect(json.data.nasabah).to.have.property('email');",
+                  "});",
+                  "",
+                  "// Simpan id agar request berikutnya bisa pakai {{nasabahId}}",
+                  "if (json?.data?.nasabah?.id) {",
+                  "  pm.environment.set('nasabahId', json.data.nasabah.id);",
+                  "  console.log('nasabahId tersimpan:', json.data.nasabah.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nik\": \"{{runNik}}\",\n  \"nama\": \"Ahmad Fauzi\",\n  \"email\": \"{{runEmail}}\",\n  \"nomorHp\": \"081234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah"]
+            }
+          }
+        },
+        {
+          "name": "Create Nasabah - Validation Error (contoh 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Error envelope: code=VALIDATION_ERROR + fieldErrors', () => {",
+                  "  pm.expect(json).to.have.property('data', null);",
+                  "  pm.expect(json.error).to.have.property('code', 'VALIDATION_ERROR');",
+                  "  pm.expect(json.error).to.have.property('details');",
+                  "  pm.expect(json.error.details).to.have.property('fieldErrors');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nik\": \"123\",\n  \"nama\": \"A\",\n  \"email\": \"bukan-email\",\n  \"nomorHp\": \"999\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah"]
+            }
+          }
+        },
+        {
+          "name": "List Nasabah",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Data berupa array', () => {",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Meta.pagination lengkap', () => {",
+                  "  pm.expect(json.meta).to.have.property('pagination');",
+                  "  pm.expect(json.meta.pagination).to.include.all.keys('page', 'limit', 'total', 'totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Nasabah - Search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Data array (boleh kosong)', () => {",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah?page=1&limit=10&search=ahmad",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "search", "value": "ahmad" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detail Nasabah by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Data.id sama dengan {{nasabahId}}', () => {",
+                  "  pm.expect(json.data).to.have.property('id', pm.environment.get('nasabahId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+            }
+          }
+        },
+        {
+          "name": "Detail Nasabah - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Error code = NOT_FOUND', () => {",
+                  "  pm.expect(json.error).to.have.property('code', 'NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "Update Nasabah",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Nasabah ter-update', () => {",
+                  "  pm.expect(json.data).to.have.property('nasabah');",
+                  "  pm.expect(json.data.nasabah).to.have.property('nama', 'Ahmad Fauzi (Updated)');",
+                  "  pm.expect(json.data.nasabah).to.have.property('nomorHp', '081234567891');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Ahmad Fauzi (Updated)\",\n  \"nomorHp\": \"081234567891\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Nasabah - Empty Body (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Error code = VALIDATION_ERROR', () => {",
+                  "  pm.expect(json.error).to.have.property('code', 'VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Nasabah",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Pesan delete sukses', () => {",
+                  "  pm.expect(json.data).to.have.property('message');",
+                  "  pm.expect(json.data.message.toLowerCase()).to.include('deleted');",
+                  "});",
+                  "",
+                  "// Bersihkan nasabahId agar tidak nyangkut di run berikutnya",
+                  "pm.environment.unset('nasabahId');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
