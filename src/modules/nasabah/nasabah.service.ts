@@ -1,16 +1,30 @@
+import bcrypt from 'bcrypt';
 import { prisma } from '../../lib/prisma';
-// Kita ambil tipe data yang benar dari file schema, bukan controller
 import type {
   CreateNasabahInput,
   ListNasabahQuery,
   UpdateNasabahInput,
 } from './nasabah.schema';
 
-export const nasabahService = {
-  // Pastikan nama tipe datanya menggunakan huruf besar sesuai yang ada di schema (CreateNasabahInput)
-  create: (data: CreateNasabahInput) => prisma.nasabah.create({ data }),
+const SAFE_SELECT = {
+  id: true,
+  nik: true,
+  nama: true,
+  email: true,
+  nomorHp: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
-  // List nasabah dengan pagination + opsional pencarian by nama/nik/email
+export const nasabahService = {
+  create: async (data: CreateNasabahInput) => {
+    const hashed = await bcrypt.hash(data.password, 10);
+    return prisma.nasabah.create({
+      data: { ...data, password: hashed },
+      select: SAFE_SELECT,
+    });
+  },
+
   findMany: async ({ page, limit, search }: ListNasabahQuery) => {
     const where = search
       ? {
@@ -28,6 +42,7 @@ export const nasabahService = {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        select: SAFE_SELECT,
       }),
       prisma.nasabah.count({ where }),
     ]);
@@ -35,10 +50,11 @@ export const nasabahService = {
     return { items, total, page, limit };
   },
 
-  findById: (id: string) => prisma.nasabah.findUnique({ where: { id } }),
+  findById: (id: string) =>
+    prisma.nasabah.findUnique({ where: { id }, select: SAFE_SELECT }),
 
   update: (id: string, data: UpdateNasabahInput) =>
-    prisma.nasabah.update({ where: { id }, data }),
+    prisma.nasabah.update({ where: { id }, data, select: SAFE_SELECT }),
 
   remove: (id: string) => prisma.nasabah.delete({ where: { id } }),
 };

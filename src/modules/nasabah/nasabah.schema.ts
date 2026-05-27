@@ -16,6 +16,10 @@ export const CreateNasabahSchema = z.object({
   nomorHp: z
     .string()
     .regex(/^08\d{8,11}$/, "Nomor HP harus format 08xxxxxxxxxx (10-13 digit)"),
+  password: z
+    .string()
+    .min(8, "Password minimal 8 karakter")
+    .max(72, "Password maksimal 72 karakter"),
 });
 
 export type CreateNasabahInput = z.infer<typeof CreateNasabahSchema>;

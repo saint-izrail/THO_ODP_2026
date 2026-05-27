@@ -21,6 +21,7 @@ model Nasabah {
   nama         String         @db.VarChar(100)
   email        String         @unique @db.VarChar(150)
   nomorHp      String         @map("nomor_hp") @db.VarChar(20)
+  password     String?        @db.VarChar(255)
   tabungan     TabunganHaji[]
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
@@ -54,4 +55,24 @@ model Transaksi {
   waktu          DateTime     @default(now())
 
   @@map("transaksi")
+}
+
+model IdempotencyKey {
+  key        String   @id @db.VarChar(100)
+  endpoint   String   @db.VarChar(255)
+  statusCode Int      @map("status_code")
+  response   Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("idempotency_keys")
+}
+
+model TokenBlocklist {
+  jti       String   @id @db.VarChar(100)
+  nasabahId String?  @map("nasabah_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("token_blocklist")
 }

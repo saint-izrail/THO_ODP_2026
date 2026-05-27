@@ -1,17 +1,18 @@
 import { Router } from "express";
 import { nasabahController } from './nasabah.controller';
+import { requireAuth } from "../../middleware/requireAuth";
 
 const router = Router();
 
-// GET     /          -> list nasabah (pagination + search)
-// GET     /:id       -> detail nasabah by id
-// POST    /          -> create nasabah
-// PATCH   /:id       -> update nasabah
-// DELETE  /:id       -> hapus nasabah
-router.get("/", nasabahController.list);
-router.get("/:id", nasabahController.detail);
+// POST   /        -> register nasabah (PUBLIC)
+// GET    /        -> list (auth)
+// GET    /:id     -> detail (auth)
+// PATCH  /:id     -> update (auth)
+// DELETE /:id     -> hapus (auth)
 router.post("/", nasabahController.create);
-router.patch("/:id", nasabahController.update);
-router.delete("/:id", nasabahController.remove);
+router.get("/", requireAuth, nasabahController.list);
+router.get("/:id", requireAuth, nasabahController.detail);
+router.patch("/:id", requireAuth, nasabahController.update);
+router.delete("/:id", requireAuth, nasabahController.remove);
 
 export default router;

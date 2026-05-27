@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Tabungan Haji API",
-    "description": "Koleksi endpoint untuk Tabungan Haji API.\n\n**Cara pakai:**\n1. Import file ini + `tabungan-haji.postman_environment.json`.\n2. Pilih environment `Tabungan Haji - Local` di pojok kanan atas Postman.\n3. Jalankan `npm run dev` di project.\n4. Test mulai dari folder Health → Nasabah (Create akan otomatis menyimpan `nasabahId` ke environment, dipakai oleh request Detail/Update/Delete).\n5. Bisa juga di-run sekaligus via **Collection Runner** — tiap request sudah punya assertion otomatis.",
+    "description": "Koleksi endpoint untuk Tabungan Haji API.\n\n**Cara pakai:**\n1. Import file ini + `tabungan-haji.postman_environment.json`.\n2. Pilih environment `Tabungan Haji - Local` di pojok kanan atas Postman.\n3. Jalankan `npm run dev` di project.\n4. Test mulai dari folder Health \u2192 Nasabah (Create akan otomatis menyimpan `nasabahId` ke environment, dipakai oleh request Detail/Update/Delete).\n5. Bisa juga di-run sekaligus via **Collection Runner** \u2014 tiap request sudah punya assertion otomatis.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -33,10 +33,356 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "THO-209 Login (happy 200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmad.fauzi@example.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Punya token + user', () => {",
+                  "  pm.expect(json.data).to.have.property('token');",
+                  "  pm.expect(json.data.tokenType).to.eql('Bearer');",
+                  "  pm.expect(json.data.user).to.have.property('id');",
+                  "});",
+                  "pm.environment.set('token', json.data.token);",
+                  "pm.environment.set('loggedInUserId', json.data.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-209 Login - Wrong Password (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ahmad.fauzi@example.com\",\n  \"password\": \"salah-banget\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('error.code = INVALID_CREDENTIALS', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('INVALID_CREDENTIALS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-209 Login - Email Tidak Ada (401, generic)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tidak.ada@example.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Pesan generik (tidak leak akun ada/tidak)', () => {",
+                  "  pm.expect(pm.response.json().error.message).to.match(/Email atau password salah/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-209 Login - Validation (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bukan-email\",\n  \"password\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-210 Probe - Tanpa Token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('error.code = UNAUTHORIZED', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-210 Probe - Token Invalid (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not.a.valid.jwt"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('error.code = INVALID_TOKEN', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('INVALID_TOKEN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-211 Logout (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Pesan revoke', () => {",
+                  "  pm.expect(pm.response.json().data.message).to.include('revoke');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-211 Logout Effect - Token Revoked (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('error.code = TOKEN_REVOKED', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('TOKEN_REVOKED');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -105,8 +451,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah"
+              ]
             }
           }
         },
@@ -146,8 +498,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah"
+              ]
             }
           }
         },
@@ -177,15 +535,36 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah?page=1&limit=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" },
-                { "key": "search", "value": "", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -211,15 +590,35 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah?page=1&limit=10&search=ahmad",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" },
-                { "key": "search", "value": "ahmad" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "ahmad"
+                }
               ]
             }
           }
@@ -245,11 +644,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah",
+                "{{nasabahId}}"
+              ]
             }
           }
         },
@@ -274,11 +685,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah/00000000-0000-0000-0000-000000000000",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah", "00000000-0000-0000-0000-000000000000"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah",
+                "00000000-0000-0000-0000-000000000000"
+              ]
             }
           }
         },
@@ -307,6 +730,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -317,8 +744,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah",
+                "{{nasabahId}}"
+              ]
             }
           }
         },
@@ -345,6 +779,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -355,8 +793,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah",
+                "{{nasabahId}}"
+              ]
             }
           }
         },
@@ -385,13 +830,921 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/nasabah/{{nasabahId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "nasabah", "{{nasabahId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah",
+                "{{nasabahId}}"
+              ]
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "Tabungan Haji",
+      "item": [
+        {
+          "name": "THO-205 Buka Rekening (happy 201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nasabahId\": \"{{nasabahId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Punya data.tabungan dengan id & nomorRekening', () => {",
+                  "  pm.expect(json.data.tabungan).to.have.property('id');",
+                  "  pm.expect(json.data.tabungan).to.have.property('nomorRekening');",
+                  "});",
+                  "pm.environment.set('tabunganId', json.data.tabungan.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-205 Buka Rekening - Duplikat (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nasabahId\": \"{{nasabahId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error.code = DUPLICATE_TABUNGAN', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('DUPLICATE_TABUNGAN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-205 Buka Rekening - Nasabah Belum Daftar (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nasabahId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('error.code = NASABAH_NOT_REGISTERED', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('NASABAH_NOT_REGISTERED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-205 Buka Rekening - Validasi (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nasabahId\": \"bukan-uuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-207 Detail Tabungan (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Punya saldo, status, nasabah', () => {",
+                  "  pm.expect(json.data).to.have.property('saldo');",
+                  "  pm.expect(json.data).to.have.property('status');",
+                  "  pm.expect(json.data).to.have.property('nasabah');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-207 Detail Tabungan - Not Found (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-207 Detail Tabungan - Invalid UUID (422)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/bukan-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "bukan-uuid"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-206 Setor (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 250000,\n  \"metode\": \"QRIS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const key = (typeof crypto !== 'undefined' && crypto.randomUUID)",
+                  "  ? crypto.randomUUID()",
+                  "  : ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx').replace(/[xy]/g, c => {",
+                  "      const r = Math.random() * 16 | 0;",
+                  "      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                  "    });",
+                  "pm.environment.set('idempotencyKey', key);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Transaksi tersimpan', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data.transaksi).to.have.property('id');",
+                  "  pm.expect(json.data.transaksi.jenis).to.eql('SETORAN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-206 Setor - Replay (201 + Idempotency-Replayed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 250000,\n  \"metode\": \"QRIS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Header Idempotency-Replayed = true', () => {",
+                  "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-206 Setor - Minimum 100rb (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "test-minimum-fail-12345678"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 50000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Pesan minimum 100rb', () => {",
+                  "  pm.expect(JSON.stringify(pm.response.json().error.details)).to.include('Minimum setoran');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-206 Setor - Tanpa Idempotency-Key (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 100000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error.code = IDEMPOTENCY_KEY_REQUIRED', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('IDEMPOTENCY_KEY_REQUIRED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-208 Mutasi - List All (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/mutasi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "mutasi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Punya pagination meta', () => {",
+                  "  pm.expect(pm.response.json().meta.pagination).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-208 Mutasi - Filter Jenis=SETORAN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/mutasi?jenis=SETORAN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "mutasi"
+              ],
+              "query": [
+                {
+                  "key": "jenis",
+                  "value": "SETORAN"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Semua jenis SETORAN', () => {",
+                  "  pm.response.json().data.forEach(it => pm.expect(it.jenis).to.eql('SETORAN'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-208 Mutasi - Pagination (limit=1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/mutasi?page=1&limit=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "mutasi"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Max 1 item per page', () => {",
+                  "  pm.expect(pm.response.json().data.length).to.be.at.most(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-212 Estimasi Tahun Berangkat (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/estimasi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "estimasi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Punya field saldoSekarang, targetPorsi, estimasiTahunBerangkat', () => {",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d).to.have.property('saldoSekarang');",
+                  "  pm.expect(d).to.have.property('targetPorsi');",
+                  "  pm.expect(d).to.have.property('estimasiTahunBerangkat');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-212 Estimasi - Not Found (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/00000000-0000-0000-0000-000000000000/estimasi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "00000000-0000-0000-0000-000000000000",
+                "estimasi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "THO-213 Export CSV Bulanan (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/transaksi-bulanan?month=2026-05",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "transaksi-bulanan"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2026-05"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Type text/csv', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "});",
+                  "pm.test('Header Content-Disposition attachment', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Disposition')).to.include('attachment');",
+                  "});",
+                  "pm.test('CSV body punya header row', () => {",
+                  "  pm.expect(pm.response.text()).to.include('waktu,nomor_rekening');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-213 Export CSV - Invalid Month (422)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/transaksi-bulanan?month=2026-13",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "transaksi-bulanan"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2026-13"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "THO-213 Export CSV - Tanpa Token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/transaksi-bulanan?month=2026-05",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "transaksi-bulanan"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2026-05"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
