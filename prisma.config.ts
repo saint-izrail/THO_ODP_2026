@@ -10,7 +10,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   engine: "classic",
+  // CLI/migrasi memakai DIRECT_URL (koneksi langsung, bukan pgbouncer pooler).
   datasource: {
-    url: env("DATABASE_URL"),
+    url: env("DIRECT_URL"),
   },
 });

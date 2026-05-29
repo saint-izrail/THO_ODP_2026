@@ -45,6 +45,543 @@
       ]
     },
     {
+      "name": "E2E Happy Path (Daftar -> Report CSV)",
+      "item": [
+        {
+          "name": "E2E 1 - Daftar Nasabah (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nasabah",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nasabah"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nik\": \"{{e2eNik}}\",\n  \"nama\": \"E2E Tester\",\n  \"email\": \"{{e2eEmail}}\",\n  \"nomorHp\": \"081200000000\",\n  \"password\": \"{{e2ePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Buat identitas unik tiap run agar tidak kena unique constraint",
+                  "const ts = Date.now().toString();",
+                  "const rnd = Math.floor(Math.random() * 900 + 100).toString();",
+                  "pm.environment.set('e2eNik', (ts + rnd).slice(0, 16));",
+                  "pm.environment.set('e2eEmail', `e2e.${ts}@example.com`);",
+                  "pm.environment.set('e2ePassword', 'Password123!');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Nasabah punya id', () => pm.expect(json.data.nasabah).to.have.property('id'));",
+                  "pm.environment.set('nasabahId', json.data.nasabah.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 2 - Login (200, simpan token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{e2eEmail}}\",\n  \"password\": \"{{e2ePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Dapat token Bearer', () => {",
+                  "  pm.expect(json.data).to.have.property('token');",
+                  "  pm.expect(json.data.tokenType).to.eql('Bearer');",
+                  "});",
+                  "pm.environment.set('token', json.data.token);",
+                  "pm.environment.set('loggedInUserId', json.data.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 3 - Buka Rekening (201, simpan tabunganId)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nasabahId\": \"{{nasabahId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Rekening dibuat', () => pm.expect(json.data.tabungan).to.have.property('nomorRekening'));",
+                  "pm.environment.set('tabunganId', json.data.tabungan.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 4 - Detail Tabungan (saldo awal 0)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Saldo awal 0', () => pm.expect(String(pm.response.json().data.saldo)).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 5 - Setor #1 Rp500.000 (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 500000,\n  \"metode\": \"TRANSFER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const key = (typeof crypto !== 'undefined' && crypto.randomUUID)",
+                  "  ? crypto.randomUUID()",
+                  "  : ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx').replace(/[xy]/g, c => {",
+                  "      const r = Math.random() * 16 | 0;",
+                  "      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                  "    });",
+                  "pm.environment.set('idempotencyKey', key);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Jenis SETORAN & saldo jadi 500.000', () => {",
+                  "  pm.expect(json.data.transaksi.jenis).to.eql('SETORAN');",
+                  "  pm.expect(String(json.data.transaksi.saldoSesudah)).to.eql('500000');",
+                  "});",
+                  "pm.environment.set('saldoSesudah', String(json.data.transaksi.saldoSesudah));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 6 - Setor #1 Replay (idempotent, tidak dobel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 500000,\n  \"metode\": \"TRANSFER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Header Idempotency-Replayed = true', () => {",
+                  "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 7 - Setor #2 Rp250.000 (key baru, saldo 750.000)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/setor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "setor"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nominal\": 250000,\n  \"metode\": \"QRIS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const key = (typeof crypto !== 'undefined' && crypto.randomUUID)",
+                  "  ? crypto.randomUUID()",
+                  "  : ('k-' + Date.now() + '-' + Math.random().toString(16).slice(2));",
+                  "pm.environment.set('idempotencyKey', key);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Saldo jadi 750.000', () => {",
+                  "  pm.expect(String(pm.response.json().data.transaksi.saldoSesudah)).to.eql('750000');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 8 - Mutasi (2 transaksi, replay tidak dobel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/mutasi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "mutasi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Total tepat 2 transaksi', () => {",
+                  "  pm.expect(pm.response.json().meta.pagination.total).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 9 - Estimasi Tahun Berangkat (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tabungan-haji/{{tabunganId}}/estimasi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tabungan-haji",
+                "{{tabunganId}}",
+                "estimasi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Ada estimasiTahunBerangkat', () => pm.expect(pm.response.json().data).to.have.property('estimasiTahunBerangkat'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E 10 - Report CSV Bulan Ini (berisi transaksi kita)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/transaksi-bulanan?month={{e2eMonth}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "transaksi-bulanan"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "{{e2eMonth}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Bulan berjalan (YYYY-MM) sesuai waktu transaksi yang baru dibuat",
+                  "pm.environment.set('e2eMonth', new Date().toISOString().slice(0, 7));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Type text/csv', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+                  "const csv = pm.response.text();",
+                  "pm.test('Ada header row CSV', () => pm.expect(csv).to.include('waktu,nomor_rekening'));",
+                  "pm.test('CSV memuat NIK nasabah E2E (bukti end-to-end)', () => {",
+                  "  pm.expect(csv).to.include(pm.environment.get('e2eNik'));",
+                  "});",
+                  "pm.test('Minimal 2 baris data (X-Report-Rows)', () => {",
+                  "  pm.expect(Number(pm.response.headers.get('X-Report-Rows'))).to.be.at.least(2);",
+                  "});",
+                  "console.log('CSV preview (4 baris pertama):\\n' + csv.split('\\n').slice(0, 4).join('\\n'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "item": [
         {

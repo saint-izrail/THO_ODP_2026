@@ -81,6 +81,26 @@ export const tabunganHajiController = {
     }
   },
 
+  // GET /saya — tabungan aktif milik nasabah yang sedang login (req.user dari requireAuth)
+  async saya(req: Request, res: Response, next: NextFunction) {
+    if (!req.user) {
+      return err(res, 401, "UNAUTHORIZED", "Tidak ter-autentikasi");
+    }
+    try {
+      const tabungan = await tabunganHajiService.findActiveTabunganByNasabah(
+        req.user.id
+      );
+      // data null = nasabah belum punya tabungan aktif (bukan error)
+      return res.status(200).json({
+        data: tabungan,
+        error: null,
+        meta: { timestamp: ts() },
+      });
+    } catch (e: any) {
+      next(e);
+    }
+  },
+
   // THO-207: GET /:id
   async detail(req: Request, res: Response, next: NextFunction) {
     const parsed = TabunganHajiIdParamSchema.safeParse(req.params);

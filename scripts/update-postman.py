@@ -402,12 +402,183 @@ def patch_nasabah_folder(folder):
     return folder
 
 
+# ========== E2E HAPPY PATH FOLDER (Daftar -> Report CSV) ==========
+# Folder berurutan & self-seeding: bisa di-run sendiri via Collection Runner
+# pada DB kosong sekalipun (membuat nasabah unik tiap run).
+E2E_NAME = "E2E Happy Path (Daftar -> Report CSV)"
+e2e_folder = {
+    "name": E2E_NAME,
+    "item": [
+        req(
+            "E2E 1 - Daftar Nasabah (201)",
+            "POST", "/api/v1/nasabah",
+            headers=hjson(),
+            body={
+                "nik": "{{e2eNik}}",
+                "nama": "E2E Tester",
+                "email": "{{e2eEmail}}",
+                "nomorHp": "081200000000",
+                "password": "{{e2ePassword}}",
+            },
+            prereq=[
+                "// Buat identitas unik tiap run agar tidak kena unique constraint",
+                "const ts = Date.now().toString();",
+                "const rnd = Math.floor(Math.random() * 900 + 100).toString();",
+                "pm.environment.set('e2eNik', (ts + rnd).slice(0, 16));",
+                "pm.environment.set('e2eEmail', `e2e.${ts}@example.com`);",
+                "pm.environment.set('e2ePassword', 'Password123!');",
+            ],
+            tests=[
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const json = pm.response.json();",
+                "pm.test('Nasabah punya id', () => pm.expect(json.data.nasabah).to.have.property('id'));",
+                "pm.environment.set('nasabahId', json.data.nasabah.id);",
+            ],
+        ),
+        req(
+            "E2E 2 - Login (200, simpan token)",
+            "POST", "/api/v1/auth/login",
+            headers=hjson(),
+            body={"email": "{{e2eEmail}}", "password": "{{e2ePassword}}"},
+            tests=[
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const json = pm.response.json();",
+                "pm.test('Dapat token Bearer', () => {",
+                "  pm.expect(json.data).to.have.property('token');",
+                "  pm.expect(json.data.tokenType).to.eql('Bearer');",
+                "});",
+                "pm.environment.set('token', json.data.token);",
+                "pm.environment.set('loggedInUserId', json.data.user.id);",
+            ],
+        ),
+        req(
+            "E2E 3 - Buka Rekening (201, simpan tabunganId)",
+            "POST", "/api/v1/tabungan-haji",
+            auth=True, headers=hjson(),
+            body={"nasabahId": "{{nasabahId}}"},
+            tests=[
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const json = pm.response.json();",
+                "pm.test('Rekening dibuat', () => pm.expect(json.data.tabungan).to.have.property('nomorRekening'));",
+                "pm.environment.set('tabunganId', json.data.tabungan.id);",
+            ],
+        ),
+        req(
+            "E2E 4 - Detail Tabungan (saldo awal 0)",
+            "GET", "/api/v1/tabungan-haji/{{tabunganId}}",
+            auth=True,
+            tests=[
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Saldo awal 0', () => pm.expect(String(pm.response.json().data.saldo)).to.eql('0'));",
+            ],
+        ),
+        req(
+            "E2E 5 - Setor #1 Rp500.000 (201)",
+            "POST", "/api/v1/tabungan-haji/{{tabunganId}}/setor",
+            auth=True, headers=hidemp(),
+            body={"nominal": 500000, "metode": "TRANSFER"},
+            prereq=[
+                "const key = (typeof crypto !== 'undefined' && crypto.randomUUID)",
+                "  ? crypto.randomUUID()",
+                "  : ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx').replace(/[xy]/g, c => {",
+                "      const r = Math.random() * 16 | 0;",
+                "      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                "    });",
+                "pm.environment.set('idempotencyKey', key);",
+            ],
+            tests=[
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const json = pm.response.json();",
+                "pm.test('Jenis SETORAN & saldo jadi 500.000', () => {",
+                "  pm.expect(json.data.transaksi.jenis).to.eql('SETORAN');",
+                "  pm.expect(String(json.data.transaksi.saldoSesudah)).to.eql('500000');",
+                "});",
+                "pm.environment.set('saldoSesudah', String(json.data.transaksi.saldoSesudah));",
+            ],
+        ),
+        req(
+            "E2E 6 - Setor #1 Replay (idempotent, tidak dobel)",
+            "POST", "/api/v1/tabungan-haji/{{tabunganId}}/setor",
+            auth=True, headers=hidemp(),
+            body={"nominal": 500000, "metode": "TRANSFER"},
+            tests=[
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "pm.test('Header Idempotency-Replayed = true', () => {",
+                "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+                "});",
+            ],
+        ),
+        req(
+            "E2E 7 - Setor #2 Rp250.000 (key baru, saldo 750.000)",
+            "POST", "/api/v1/tabungan-haji/{{tabunganId}}/setor",
+            auth=True, headers=hidemp(),
+            body={"nominal": 250000, "metode": "QRIS"},
+            prereq=[
+                "const key = (typeof crypto !== 'undefined' && crypto.randomUUID)",
+                "  ? crypto.randomUUID()",
+                "  : ('k-' + Date.now() + '-' + Math.random().toString(16).slice(2));",
+                "pm.environment.set('idempotencyKey', key);",
+            ],
+            tests=[
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "pm.test('Saldo jadi 750.000', () => {",
+                "  pm.expect(String(pm.response.json().data.transaksi.saldoSesudah)).to.eql('750000');",
+                "});",
+            ],
+        ),
+        req(
+            "E2E 8 - Mutasi (2 transaksi, replay tidak dobel)",
+            "GET", "/api/v1/tabungan-haji/{{tabunganId}}/mutasi",
+            auth=True,
+            tests=[
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Total tepat 2 transaksi', () => {",
+                "  pm.expect(pm.response.json().meta.pagination.total).to.eql(2);",
+                "});",
+            ],
+        ),
+        req(
+            "E2E 9 - Estimasi Tahun Berangkat (200)",
+            "GET", "/api/v1/tabungan-haji/{{tabunganId}}/estimasi",
+            auth=True,
+            tests=[
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Ada estimasiTahunBerangkat', () => pm.expect(pm.response.json().data).to.have.property('estimasiTahunBerangkat'));",
+            ],
+        ),
+        req(
+            "E2E 10 - Report CSV Bulan Ini (berisi transaksi kita)",
+            "GET", "/api/v1/reports/transaksi-bulanan",
+            auth=True,
+            query=[("month", "{{e2eMonth}}")],
+            prereq=[
+                "// Bulan berjalan (YYYY-MM) sesuai waktu transaksi yang baru dibuat",
+                "pm.environment.set('e2eMonth', new Date().toISOString().slice(0, 7));",
+            ],
+            tests=[
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Content-Type text/csv', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+                "const csv = pm.response.text();",
+                "pm.test('Ada header row CSV', () => pm.expect(csv).to.include('waktu,nomor_rekening'));",
+                "pm.test('CSV memuat NIK nasabah E2E (bukti end-to-end)', () => {",
+                "  pm.expect(csv).to.include(pm.environment.get('e2eNik'));",
+                "});",
+                "pm.test('Minimal 2 baris data (X-Report-Rows)', () => {",
+                "  pm.expect(Number(pm.response.headers.get('X-Report-Rows'))).to.be.at.least(2);",
+                "});",
+                "console.log('CSV preview (4 baris pertama):\\n' + csv.split('\\n').slice(0, 4).join('\\n'));",
+            ],
+        ),
+    ],
+}
+
+
 # === Apply ===
 coll = json.loads(COLL.read_text(encoding="utf-8"))
 
 # Remove old auto-generated folders
 keep = []
-managed = {"Auth", "Tabungan Haji", "Reports"}
+managed = {"Auth", "Tabungan Haji", "Reports", E2E_NAME}
 for it in coll["item"]:
     if it["name"] == "Nasabah":
         keep.append(patch_nasabah_folder(it))
@@ -416,9 +587,11 @@ for it in coll["item"]:
 
 # Order: Health → Auth → Nasabah → Tabungan Haji → Reports
 ordered = []
-for n in ["Health", "Auth", "Nasabah", "Tabungan Haji", "Reports"]:
+for n in ["Health", E2E_NAME, "Auth", "Nasabah", "Tabungan Haji", "Reports"]:
     if n == "Auth":
         ordered.append(auth_folder)
+    elif n == E2E_NAME:
+        ordered.append(e2e_folder)
     elif n == "Tabungan Haji":
         ordered.append(tabungan_folder)
     elif n == "Reports":
@@ -436,11 +609,12 @@ print(f"     folders: {[it['name'] for it in coll['item']]}")
 print(f"     auth requests: {len(auth_folder['item'])}")
 print(f"     tabungan haji requests: {len(tabungan_folder['item'])}")
 print(f"     reports requests: {len(reports_folder['item'])}")
+print(f"     e2e requests: {len(e2e_folder['item'])}")
 
 # --- Update environment ---
 env = json.loads(ENV.read_text(encoding="utf-8"))
 existing_keys = {v["key"] for v in env["values"]}
-for new_key in ["tabunganId", "idempotencyKey", "saldoSesudah", "token", "loggedInUserId"]:
+for new_key in ["tabunganId", "idempotencyKey", "saldoSesudah", "token", "loggedInUserId", "e2eNik", "e2eEmail", "e2ePassword", "e2eMonth"]:
     if new_key not in existing_keys:
         env["values"].append({"key": new_key, "value": "", "type": "default", "enabled": True})
 ENV.write_text(json.dumps(env, indent=2), encoding="utf-8")
